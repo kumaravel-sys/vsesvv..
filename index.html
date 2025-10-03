@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Indian Stock Market Simulator</title>
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <style>
+    :root {--bg:#07111b;--card:#0a1620;--accent:#08c36a;--muted:#98a5b3;--text:#e8f1f5;}
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+    body{margin:0;background:var(--bg);color:var(--text);}
+    .wrap{max-width:1200px;margin:16px auto;padding:12px;}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+    h1{font-size:20px;margin:0;}
+    .muted{color:var(--muted);font-size:13px;}
+    .row{display:flex;gap:12px;}
+    .col{flex:1;}
+    .card{background:var(--card);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);}
+    input,select,button{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--text);}
+    button{cursor:pointer;}
+    .center{text-align:center;}
+    .hidden{display:none;}
+    .app{display:grid;grid-template-columns:300px 1fr;gap:12px;margin-top:12px;}
+    .sidebar{height:calc(100vh - 120px);overflow:auto;}
+    .stock-item{padding:10px;border-radius:8px;margin-bottom:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.02);}
+    .stock-item:hover{background:rgba(255,255,255,0.02);}
+    .selected{background:linear-gradient(90deg, rgba(8,195,106,0.06), transparent);border-color:rgba(8,195,106,0.18);}
+    .small{font-size:13px;}
+    .controls{display:flex;gap:8px;align-items:center;}
+    .trade-controls{display:flex;gap:8px;align-items:center;margin-top:8px;}
+    table{width:100%;border-collapse:collapse;margin-top:8px;}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left;}
+    .btn{background:var(--accent);color:#04211a;border:none;padding:8px 10px;border-radius:8px;}
+    .btn-danger{background:#ff6b6b;color:#280000;}
+    .leader{display:flex;gap:8px;flex-direction:column;}
+    .settings{display:flex;gap:8px;flex-direction:column;margin-top:8px;}
+    @media(max-width:980px){.app{grid-template-columns:1fr;}}
+    #searchBar{width:100%;margin-bottom:8px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--text);}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Indian Stock Market Simulator</h1>
+      <div class="muted">Real Indian market • Trading simulation • Finnhub + TradingView</div>
+    </div>
+    <div class="controls">
+      <div class="muted">Background</div>
+      <input id="bgColor" type="color" value="#07111b" />
+      <div style="width:14px"></div>
+      <div id="userControls" class="muted"></div>
+    </div>
+  </header>
+
+  <!-- SITE PASSWORD -->
+  <div id="loginCard" class="card" style="margin-top:12px">
+    <div id="gateArea" class="center">
+      <h2>Enter Site Password</h2>
+      <input id="sitePass" placeholder="Site password" />
+      <div style="margin-top:10px"><button id="siteEnter" class="btn">Enter</button></div>
+      <div class="muted small" style="margin-top:10px">Only for registered users</div>
+    </div>
+
+    <div id="authArea" class="hidden" style="margin-top:12px">
+      <h3 class="center">Register / Login</h3>
+      <label>Email</label><input id="email" placeholder="you@example.com" />
+      <label>Password</label><input id="pass" placeholder="min 4 chars" />
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
+        <button id="btnRegister" class="btn">Register</button>
+        <button id="btnLogin" class="btn">Login</button>
+      </div>
+      <div id="loginMsg" class="muted small center" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="appArea" class="app hidden" aria-hidden="true">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="small muted">User</div>
+            <div id="uiName">—</div>
+          </div>
+          <div>
+            <div class="small muted">Total Wealth</div>
+            <div id="uiWealth">₹0</div>
+          </div>
+        </div>
+
+        <input type="text" id="searchBar" placeholder="Search stock by name or symbol" />
+
+        <div style="margin-top:12px">
+          <div class="small muted">Stocks (click to open)</div>
+          <div id="stockList" style="margin-top:8px"></div>
+        </div>
+
+        <div style="margin-top:12px" class="small muted">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div>Admin</div>
+            <button id="openAdmin" class="btn">Admin</button>
+          </div>
+          <div class="small muted" style="margin-top:8px">Leaderboard</div>
+          <div id="leaderboard" style="margin-top:6px"></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="small muted">Settings</div>
+          <div class="settings">
+            <label class="small muted">Starting balance (admin)</label>
+            <input id="startingBalance" />
+            <button id="saveSettings" class="btn">Save</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div id="selName" style="font-weight:700">Select a stock</div>
+            <div id="selSym" class="small muted">---</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="chartRange">
+              <option value="1M">1M</option>
+              <option value="3M">3M</option>
+              <option value="6M">6M</option>
+              <option value="1Y">1Y</option>
+              <option value="MAX">MAX</option>
+            </select>
+            <button id="logoutBtn" class="btn">Logout</button>
+          </div>
+        </div>
+
+        <div id="chartBox" style="margin-top:12px">
+          <div id="tv_chart_container" style="height:480px"></div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:12px">
+          <div class="col card">
+            <div class="small muted">Live Price</div>
+            <div id="livePrice" style="font-weight:700;font-size:20px">—</div>
+            <div id="priceChange" class="small muted">—</div>
+
+            <div style="margin-top:10px" class="small muted">Quick trade</div>
+            <div class="trade-controls">
+              <input id="qty" type="number" placeholder="Qty" style="width:100px" />
+              <button id="buyBtn" class="btn">Buy</button>
+              <button id="sellBtn" class="btn btn-danger">Sell</button>
+            </div>
+            <div id="tradeMsg" class="small muted" style="margin-top:8px"></div>
+          </div>
+
+          <div style="width:360px" class="card">
+            <div class="small muted">Company profile & fundamentals</div>
+            <div id="companyInfo" style="margin-top:8px">—</div>
+
+            <div style="margin-top:12px" class="small muted">Your portfolio</div>
+            <div id="portfolioArea" style="margin-top:8px">No holdings</div>
+
+            <div style="margin-top:12px" class="small muted">Recent transactions</div>
+            <div id="txArea" style="margin-top:8px">—</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* ========== CONFIG ========== */
+const SITE_PASSWORD = "vse2k25";
+const ADMIN_EMAIL = "admin6@vse.com";
+const ADMIN_PASS = "adminvse2k25";
+const FINNHUB_KEY = "d3bm7n1r01qqg7bv706gd3bm7n1r01qqg7bv7070"; 
+const DEFAULT_START_BALANCE = 100000;
+
+/* ========== STATE ========== */
+function loadState(){
+  const s = localStorage.getItem('sm_state');
+  if(!s){ 
+    const init = { startBalance:DEFAULT_START_BALANCE, users:{}, stocks:[] };
+    localStorage.setItem('sm_state', JSON.stringify(init));
+    return init;
+  }
+  return JSON.parse(s);
+}
+function saveState(state){ localStorage.setItem('sm_state', JSON.stringify(state)); }
+let STATE = loadState();
+let currentUser = null;
+let selectedStock = null;
+let tvWidget = null;
+let autoRefreshInterval = null;
+
+/* ---------- UI refs ---------- */
+const $ = (q)=>document.querySelector(q);
+const $$ = (q)=>Array.from(document.querySelectorAll(q));
+
+/* ========== SITE PASSWORD ========== */
+$('#siteEnter').addEventListener('click',()=>{
+  if($('#sitePass').value.trim()===SITE_PASSWORD){
+    $('#gateArea').classList.add('hidden');
+    $('#authArea').classList.remove('hidden');
+    $('#loginMsg').textContent='';
+  } else $('#loginMsg').textContent='Wrong site password';
+});
+
+/* ========== REGISTER / LOGIN ========== */
+$('#btnRegister').addEventListener('click',()=>{
+  const email=$('#email').value.trim().toLowerCase();
+  const pass=$('#pass').value;
+  if(!email||!pass||pass.length<4){ $('#loginMsg').textContent='Enter valid email & password'; return;}
+  if(STATE.users[email]){ $('#loginMsg').textContent='User exists'; return;}
+  STATE.users[email]={password:pass,balance:STATE.startBalance,holdings:{},tx:[],created:Date.now()};
+  saveState(STATE);
+  $('#loginMsg').textContent='Registered — now login';
+});
+$('#btnLogin').addEventListener('click',()=>{
+  const email=$('#email').value.trim().toLowerCase();
+  const pass=$('#pass').value;
+  if(email===ADMIN_EMAIL&&pass===ADMIN_PASS){currentUser={email,admin:true};openApp();return;}
+  const u=STATE.users[email];
+  if(!u){$('#loginMsg').textContent='No such user';return;}
+  if(u.password!==pass){$('#loginMsg').textContent='Wrong credentials';return;}
+  currentUser={email,admin:false};
+  openApp();
+});
+
+/* ========== OPEN APP ========== */
+async function openApp(){
+  $('#authArea').classList.add('hidden');
+  $('#loginCard').classList.add('hidden');
+  $('#appArea').classList.remove('hidden');
+  updateUserControls();
+  await loadAllStocks();
+  renderStockList();
+  renderLeaderboard();
+  if(currentUser.admin){
+    $('#openAdmin').style.display='inline-block';
+    $('#openAdmin').addEventListener('click', openAdmin);
+    $('#startingBalance').value=STATE.startBalance;
+    $('#saveSettings').addEventListener('click', saveSettings);
+  } else $('#openAdmin').style.display='none';
+  startAutoRefresh();
+}
+
+/* ========== LOGOUT ========== */
+$('#logoutBtn').addEventListener('click',logout);
+function logout(){
+  saveState(STATE);
+  currentUser=null; selectedStock=null;
+  if(tvWidget){try{tvWidget.remove();}catch(e){}tvWidget=null;$('#tv_chart_container').innerHTML='';}
+  $('#appArea').classList.add('hidden');
+  $('#loginCard').classList.remove('hidden');
+  $('#authArea').classList.remove('hidden');
+  stopAutoRefresh();
+}
+
+/* ========== USER INFO ========== */
+function updateUserControls(){
+  if(!currentUser) return;
+  const ua=$('#userControls');
+  if(currentUser.admin) ua.textContent='Admin';
+  else{
+    const u=STATE.users[currentUser.email];
+    const w=computeWealth(u);
+    ua.innerHTML=`${currentUser.email} • ₹${formatNumber(w)}`;
+    $('#uiName').textContent=currentUser.email;
+    $('#uiWealth').textContent='₹'+formatNumber(w);
+  }
+}
+
+/* ========== LOAD ALL INDIAN STOCKS ========== */
+async function loadAllStocks(){
+  if(STATE.stocks && STATE.stocks.length>0) return; // already loaded
+  try{
+    const res = await fetch(`https://finnhub.io/api/v1/stock/symbol?exchange=NSE&token=${FINNHUB_KEY}`);
+    const stocks = await res.json();
+    STATE.stocks = stocks.map(s=>({symbolFH:s.symbol,tv:'NSE:'+s.symbol,name:s.description||s.symbol}));
+    saveState(STATE);
+  }catch(e){console.error('Failed to fetch NSE stocks',e);}
+}
+
+/* ========== SEARCH FILTER ========== */
+$('#searchBar').addEventListener('input',()=>{
+  renderStockList($('#searchBar').value.trim().toLowerCase());
+});
+
+/* ========== RENDER STOCK LIST ========== */
+function renderStockList(filter=''){
+  const list=$('#stockList'); list.innerHTML='';
+  STATE.stocks.filter(s=>{
+    return !filter || s.name.toLowerCase().includes(filter)||s.symbolFH.toLowerCase().includes(filter);
+  }).forEach(s=>{
+    const el=document.createElement('div');
+    el.className='stock-item';
+    el.dataset.sym=s.symbolFH;
+    el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong>${s.name}</strong><div class="small muted">${s.symbolFH}</div></div>
+      <div class="small muted" data-price>—</div>
+    </div>`;
+    el.addEventListener('click',()=>selectStock(s.symbolFH));
+    list.appendChild(el);
+    fetchQuote(s.symbolFH).then(q=>{
+      const p=q&&q.c?'₹'+q.c.toFixed(2):'—';
+      el.querySelector('[data-price]').textContent=p;
+    });
+  });
+}
+
+/* ========== SELECT STOCK ========== */
+async function selectStock(sym){
+  selectedStock = STATE.stocks.find(s=>s.symbolFH===sym);
+  $$('.stock-item').forEach(it=>it.classList.toggle('selected',it.dataset.sym===sym));
+  $('#selName').textContent = selectedStock.name;
+  $('#selSym').textContent = selectedStock.symbolFH;
+  loadTradingView(selectedStock.tv);
+  const q=await fetchQuote(selectedStock.symbolFH);
+  if(q && q.c!==undefined){
+    $('#livePrice').textContent='₹'+q.c.toFixed(2);
+    $('#priceChange').textContent=`${q.d>=0?'▲':'▼'} ${q.d.toFixed(2)} (${q.dp.toFixed(2)}%)`;
+    $('#priceChange').style.color=q.d>=0?'#3ee27a':'#ff7b7b';
+  } else { $('#livePrice').textContent='—'; $('#priceChange').textContent='—'; }
+  loadFundamentals(selectedStock.symbolFH);
+  renderPortfolio(); renderTx();
+}
+
+/* ========== TRADINGVIEW CHART ========== */
+function loadTradingView(tvSymbol){
+  document.getElementById('tv_chart_container').innerHTML='';
+  try{
+    tvWidget = new TradingView.widget({
+      container_id:"tv_chart_container",
+      width:"100%",
+      height:480,
+      symbol:tvSymbol,
+      interval:"D",
+      timezone:"Asia/Kolkata",
+      theme:"dark",
+      style:"1",
+      locale:"en",
+      toolbar_bg:"#15171b",
+      enable_publishing:false,
+      allow_symbol_change:false
+    });
+  }catch(e){console.warn(e); document.getElementById('tv_chart_container').innerText='Chart failed';}
+}
+
+/* ========== FINNHUB QUOTES / FUNDAMENTALS ========== */
+async function fetchQuote(symbol){ try{const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`);return await r.json();}catch(e){return null;} }
+async function loadFundamentals(symbol){
+  $('#companyInfo').textContent='Loading...';
+  try{
+    const res = await fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_KEY}`);
+    const data = await res.json();
+    $('#companyInfo').innerHTML=`<strong>${data.name||symbol}</strong><br>Exchange: ${data.exchange}<br>Industry: ${data.finnhubIndustry||'—'}<br>Market Cap: ₹${formatNumber((data.marketCapitalization||0)*1e6)}<br>IPO: ${data.ipo||'—'}`;
+  }catch(e){$('#companyInfo').textContent='Failed to load company info';}
+}
+
+/* ========== BUY / SELL ========== */
+$('#buyBtn').addEventListener('click',()=>trade(true));
+$('#sellBtn').addEventListener('click',()=>trade(false));
+async function trade(isBuy){
+  if(!selectedStock||!currentUser||currentUser.admin) return;
+  const qty=parseInt($('#qty').value);
+  if(!qty||qty<=0){$('#tradeMsg').textContent='Enter valid quantity';return;}
+  const user=STATE.users[currentUser.email];
+  const q=await fetchQuote(selectedStock.symbolFH);
+  if(!q||q.c===undefined){$('#tradeMsg').textContent='Price not available';return;}
+  const cost=q.c*qty;
+  if(isBuy){
+    if(user.balance<cost){$('#tradeMsg').textContent='Not enough balance';return;}
+    user.balance-=cost;
+    user.holdings[selectedStock.symbolFH]=(user.holdings[selectedStock.symbolFH]||0)+qty;
+    user.tx.unshift({time:Date.now(),type:'BUY',symbol:selectedStock.symbolFH,qty,price:q.c});
+  } else {
+    if((user.holdings[selectedStock.symbolFH]||0)<qty){$('#tradeMsg').textContent='Not enough shares';return;}
+    user.balance+=cost;
+    user.holdings[selectedStock.symbolFH]-=qty;
+    if(user.holdings[selectedStock.symbolFH]<=0) delete user.holdings[selectedStock.symbolFH];
+    user.tx.unshift({time:Date.now(),type:'SELL',symbol:selectedStock.symbolFH,qty,price:q.c});
+  }
+  saveState(STATE); renderPortfolio(); renderTx(); updateUserControls();
+  $('#tradeMsg').textContent=isBuy?'Bought!':'Sold!';
+}
+
+/* ========== PORTFOLIO & TX ========== */
+function renderPortfolio(){
+  if(!currentUser||currentUser.admin){$('#portfolioArea').textContent='—';return;}
+  const u=STATE.users[currentUser.email];
+  const h=u.holdings; 
+  if(!h||Object.keys(h).length===0){$('#portfolioArea').textContent='No holdings';return;}
+  const frag=document.createElement('div');
+  Object.keys(h).forEach(sym=>{
+    const qty=h[sym];
+    const s=STATE.stocks.find(x=>x.symbolFH===sym);
+    const name=s?s.name:sym;
+    const div=document.createElement('div');
+    div.textContent=`${name} (${sym}) • Qty: ${qty}`;
+    frag.appendChild(div);
+  });
+  $('#portfolioArea').innerHTML=''; $('#portfolioArea').appendChild(frag);
+}
+function renderTx(){
+  if(!currentUser||currentUser.admin){$('#txArea').textContent='—';return;}
+  const u=STATE.users[currentUser.email];
+  if(!u.tx||u.tx.length===0){$('#txArea').textContent='—';return;}
+  const frag=document.createElement('div');
+  u.tx.slice(0,10).forEach(tx=>{
+    const div=document.createElement('div');
+    div.textContent=`${tx.type} ${tx.qty} ${tx.symbol} @ ₹${tx.price.toFixed(2)}`;
+    frag.appendChild(div);
+  });
+  $('#txArea').innerHTML=''; $('#txArea').appendChild(frag);
+}
+
+/* ========== LEADERBOARD ========== */
+function renderLeaderboard(){
+  const lb=$('#leaderboard');
+  const arr=Object.entries(STATE.users).map(([email,u])=>{
+    return {email,wealth:computeWealth(u)};
+  }).sort((a,b)=>b.wealth-a.wealth).slice(0,5);
+  lb.innerHTML=''; arr.forEach(u=>{
+    const div=document.createElement('div'); div.textContent=`${u.email} • ₹${formatNumber(u.wealth)}`;
+    lb.appendChild(div);
+  });
+}
+
+/* ========== ADMIN PANEL ========== */
+function openAdmin(){
+  alert('Admin panel\n- Edit settings\n- Reset users (refresh page to reset)');
+}
+function saveSettings(){
+  const v=parseInt($('#startingBalance').value);
+  if(isNaN(v)||v<=0){alert('Invalid'); return;}
+  STATE.startBalance=v; saveState(STATE);
+  alert('Saved');
+}
+
+/* ========== HELPER ========== */
+function formatNumber(n){ return n.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+function computeWealth(user){
+  let w=user.balance;
+  if(user.holdings) Object.keys(user.holdings).forEach(sym=>{
+    const qty=user.holdings[sym];
+    const s=STATE.stocks.find(x=>x.symbolFH===sym);
+    if(s) w+=qty*1; // placeholder, can fetch live price if needed
+  });
+  return w;
+}
+
+/* ========== AUTO REFRESH ========== */
+function startAutoRefresh(){
+  if(autoRefreshInterval) clearInterval(autoRefreshInterval);
+  autoRefreshInterval = setInterval(()=>{
+    if(selectedStock) selectStock(selectedStock.symbolFH);
+    renderStockList($('#searchBar').value.trim().toLowerCase());
+  },30000);
+}
+function stopAutoRefresh(){if(autoRefreshInterval) clearInterval(autoRefreshInterval);}
+
+/* ========== BACKGROUND COLOR CHANGE ========== */
+$('#bgColor').addEventListener('input',(e)=>{document.body.style.background=e.target.value;});
+</script>
+</body>
+</html>
